@@ -1,27 +1,37 @@
 #![allow(unused)]
 
+use model::ModelController;
 use serde::Deserialize;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
+use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
 
 pub use self::error::{Error, Result};
 
 use axum::{
     extract::{Path, Query},
-    response::{Html, IntoResponse},
+    middleware,
+    response::{Html, IntoResponse, Response},
     routing::{get, get_service},
     Router,
 };
 
 mod error;
+mod model;
 mod web;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
+    // Intialize the ModelController
+    let mc = ModelController::new().await?;
+
     let routes_all: Router = Router::new()
         .merge(routes_hello())
         .merge(web::routes_login::routes())
+        .nest("/api", web::routes_tickets::routes(mc.clone()))
+        .layer(middleware::map_response(main_response_mapper))
+        .layer(CookieManagerLayer::new())
         .fallback_service(routes_static());
 
     let addr: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080));
@@ -32,6 +42,8 @@ async fn main() {
 
     // Then pass the listener to axum::serve
     axum::serve(listener, routes_all).await.unwrap();
+
+    Ok(())
 }
 
 // Region: routes_hello
@@ -39,6 +51,12 @@ fn routes_hello() -> Router {
     Router::new()
         .route("/hello", get(handler_hello))
         .route("/hello2/:name", get(handler_hello2))
+}
+
+async fn main_response_mapper(res: Response) -> Response {
+    println!("->> {:12} = main_response_mapper", "RES_MAPPER");
+    println!();
+    res
 }
 
 fn routes_static() -> Router {

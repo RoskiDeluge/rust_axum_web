@@ -23,7 +23,7 @@ pub async fn mw_require_auth(ctx: Result<Ctx>, req: Request<Body>, next: Next) -
 pub async fn mw_ctx_resolver(
     _mc: State<ModelController>,
     cookies: Cookies,
-    req: Request<Body>,
+    mut req: Request<Body>,
     next: Next,
 ) -> Result<Response> {
     println!("->> {:12} - mw_ctx_resolver", "MIDDLEWARE");

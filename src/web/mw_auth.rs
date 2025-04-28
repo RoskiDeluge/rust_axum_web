@@ -11,17 +11,10 @@ use crate::ctx::Ctx;
 use crate::web::AUTH_TOKEN;
 use crate::{Error, Result};
 
-pub async fn mw_require_auth(cookies: Cookies, req: Request<Body>, next: Next) -> Result<Response> {
-    println!("->> {:12} - mw_require_auth", "MIDDLEWARE");
+pub async fn mw_require_auth(ctx: Result<Ctx>, req: Request<Body>, next: Next) -> Result<Response> {
+    println!("->> {:12} - mw_require_auth - {ctx:?}", "MIDDLEWARE");
 
-    let auth_token = cookies.get(AUTH_TOKEN).map(|c| c.value().to_string());
-
-    // Parse token
-    let (user_id, exp, sign) = auth_token
-        .ok_or(Error::AuthFailNoAuthTokenCookie)
-        .and_then(parse_token)?;
-
-    // TODO: Token components validation to ensure that the user_id, expiration and signature all match
+    ctx?;
 
     Ok(next.run(req).await)
 }

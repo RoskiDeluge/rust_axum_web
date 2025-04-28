@@ -17,6 +17,7 @@ async fn test_quick_dev() -> Result<()> {
             "pwd": "welcome"
         }),
     );
+
     req_login.await?.print().await?;
 
     let req_create_ticket = hc.do_post(

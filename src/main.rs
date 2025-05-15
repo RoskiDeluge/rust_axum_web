@@ -2,10 +2,12 @@
 
 use model::ModelController;
 use serde::Deserialize;
+use serde_json::json;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tower_cookies::CookieManagerLayer;
 use tower_http::services::ServeDir;
+use uuid::Uuid;
 
 pub use self::error::{Error, Result};
 
@@ -14,7 +16,7 @@ use axum::{
     middleware,
     response::{Html, IntoResponse, Response},
     routing::{get, get_service},
-    Router,
+    Json, Router,
 };
 
 mod ctx;
@@ -63,9 +65,62 @@ fn routes_hello() -> Router {
 
 async fn main_response_mapper(res: Response) -> Response {
     println!("->> {:12} = main_response_mapper", "RES_MAPPER");
+    // Generate a single UUID for the entire request/response cycle
+    let uuid = Uuid::new_v4();
+
+    // -- Get the eventual response error
+    let service_error: Option<&Error> = res.extensions().get::<Error>();
+
+    // Log the server log line with the UUID regardless of whether there was an error
+    println!("   ->> server log line - {uuid} - Error: {service_error:?}");
+
+    // Return early with a custom error response if there's an error
+    if let Some(err) = service_error {
+        let (status_code, client_error) = err.client_status_and_error();
+
+        let client_error_body = json!({
+            "error": {
+                "type": client_error.as_ref(),
+                "req_uuid": uuid.to_string(),
+            }
+        });
+
+        println!("   ->> client_error_body: {client_error_body}");
+        return (status_code, Json(client_error_body)).into_response();
+    }
+
     println!();
     res
 }
+
+// async fn main_response_mapper(res: Response) -> Response {
+//     println!("->> {:12} = main_response_mapper", "RES_MAPPER");
+//     let uuid = Uuid::new_v4();
+
+//     // -- Get the eventual response error
+//     let service_error: Option<&Error> = res.extensions().get::<Error>();
+//     let client_status_error: Option<(axum::http::StatusCode, error::ClientError)> =
+//         service_error.map(|se: &Error| se.client_status_and_error());
+
+//     // If client error, build the new response.
+//     // let error_response: Option<&(axum::http::StatusCode, error::ClientError)> = client_status_error
+//     //     .as_ref()
+//     //     .map(|(status_code, client_error)| {
+//     //         let client_error_body = json!({
+//     //             "error": {
+//     //                 "type": client_error.as_ref(),
+//     //                 "req_uuid": uuid.to_string(),
+//     //             }
+//     //         });
+//     //         println!("   ->> client_error_body: {client_error_body}");
+
+//     //         // Build the new response from the client_error_body
+//     //         (*status_code, Json(client_error_body)).into_response()
+//     //     });
+
+//     println!();
+//     res
+// }
 
 fn routes_static() -> Router {
     Router::new().nest_service("/", get_service(ServeDir::new("./")))
